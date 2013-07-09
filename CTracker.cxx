@@ -12,6 +12,8 @@ CTracker::CTracker()
 	m_ptScaleFactor.x = 1.0f;
 	m_ptScaleFactor.y = 1.0f;
 	m_fGlobalScale = 1.0f;
+	m_fOverlapThresh = 0.4f;
+	m_fCornernessThresh = 0.4f;
 	m_pTrackerList = new vector<TRACKER>;
 }
 
@@ -75,60 +77,28 @@ void CTracker::EKF_update( const Mat & img )
 			{
 				OxfordFeature * pDetectedFeature = &m_pAIAFeatureList->at(j);
 
-				// Calculate search range
-				int nMajorAxis = ( (pTrackerFeature->axes.width > 
-									pTrackerFeature->axes.height)
-								? pTrackerFeature->axes.width : 
-								  pTrackerFeature->axes.height ); 
-				int nRange = ( nMajorAxis ) ^ 2 ;
-				// Calculate distance
-				Point ptDiff = pTracker->predict_pt - pDetectedFeature->pt;
-				int nDist = ptDiff.x^2 + ptDiff.y^2;
-				// Judge the range
-				if(nDist > nRange)
+				bool bMatch;
+				MATCHRESULT matchResult;
+				bMatch = compareFeatureToTracker( pTracker, pDetectedFeature, matchResult, i, j );
+				if( bMatch )
+				{
+					vMatchList.push_back( matchResult );
+					if( matchResult.cornerDiff > fMaxDisim )
+					{
+						fMaxDisim = matchResult.cornerDiff;
+					}
+				}
+				else
 				{
 					continue;
 				}
-				
-				MATCHRESULT match;
-				match.feature_id = j;
-				// Geometrical and feature comparison
-				float fFeatureDisim = pTracker->disimalarity( *pDetectedFeature );
-				fMaxDisim = ( ( fFeatureDisim > fMaxDisim ) ?
-							fFeatureDisim : fMaxDisim );
-				match.cornerDiff = fFeatureDisim;
-				//match.cornerDiff = nDist;
-				// Overlap calculation
-				float fOverlap, fUnion;
-				pTrackerFeature->axes.width *= m_fGlobalScale;
-				pTrackerFeature->axes.height *= m_fGlobalScale;
-				fUnion = TwoEllipsesUnionArea( pTracker->predict_pt, pTrackerFeature->axes, pTrackerFeature->theta, 
-											   pDetectedFeature->pt, pDetectedFeature->axes, pDetectedFeature->theta,
-											   fOverlap );
-
-				match.overlap = 1.0 - ( fOverlap / fUnion );
-			    vMatchList.push_back( match );
 			}
 		
 			// Find the best match in the search region
-			float fMatchScore = 2000;
-			int nMatchID = -1;
-			for( int j = 0; j < vMatchList.size(); j ++ )
-			{
-				vMatchList.at(j).cornerDiff /= fMaxDisim;
-				if ( ( vMatchList.at(j).cornerDiff < 0.8 ) && ( vMatchList.at(j).overlap < 0.4 )) 
-				{
-					float score = vMatchList.at(j).cornerDiff + vMatchList.at(j).overlap;
-					if( score < fMatchScore )
-					{
-						nMatchID = vMatchList.at(j).feature_id;
-						fMatchScore = score;
-					}
-				}
-			}
+			int nMatchID = updateBestMatch( pTracker, vMatchList, fMaxDisim );
 
 			float fCurrentScale = 1.0;	
-			if( ( nMatchID != -1 ) && ( fMatchScore < 1.9) ) 
+			if( ( nMatchID != -1 ) ) 
 			{
 				if( pTracker->verify( img, m_pTrackerList, m_pAIAFeatureList->at(nMatchID), m_lFrameCnt, fCurrentScale ) )	
 				{
@@ -149,7 +119,7 @@ void CTracker::EKF_update( const Mat & img )
 		if( m_pTrackerList->at(i).last_update != m_lFrameCnt )
 		{
 			m_pTrackerList->at(i).trajVerify( m_pTrackerList, m_lFrameCnt );
-			m_pTrackerList->at(i).update_failure( m_lFrameCnt, m_pTrackerList->at(i).estimate_pt, m_fGlobalScale );
+			m_pTrackerList->at(i).update_failure( m_lFrameCnt, m_pTrackerList->at(i).predict_pt, m_fGlobalScale );
 		}
 	}
 
@@ -516,4 +486,69 @@ void CTracker::convPointToMat( const vector<Point> pts, Mat & mat )
 		mat.at<float>( 0, i ) = pts.at(i).x;
 		mat.at<float>( 1, i ) = pts.at(i).y;
 	}
+}
+
+/**
+ * Calculate the correspondeness of the tracker with feature, 
+ * return a sum score of the overlap error and cornerness error.
+ * @pTracker	The tracker pointer
+ * @pFeature	The feature pointer
+ * @result		Return the match result
+ */
+bool CTracker::compareFeatureToTracker( TRACKER *pTracker, OxfordFeature *pFeature, MATCHRESULT &result , int idx_tracker, int idx_feature )
+{
+	OxfordFeature *pTrackerFeature = pTracker->a_feature;
+	int nLongAxis = ( pTracker->a_feature->axes.width > pTracker->a_feature->axes.height )
+					? pTrackerFeature->axes.width : pTrackerFeature->axes.height;
+	int nSearchRange = nLongAxis ^ 2;
+
+	Point ptDist = pTracker->predict_pt - pFeature->pt;
+	int nDist = ptDist.x^2 + ptDist.y^2;
+	
+	if(nDist > nSearchRange)
+	{
+		return false;
+	}
+
+	result.dist = nDist;
+	result.feature_id = idx_feature;
+	result.tracker_id = idx_tracker;
+	result.cornerDiff = pTracker->disimalarity( *pFeature );
+	float fScale_w = 1.0f, fScale_h = 1.0f;
+	float fOverlap, fUnion;
+	Size szTrackerSize;
+	szTrackerSize.width = pTrackerFeature->axes.width * fScale_w; 
+	szTrackerSize.height = pTrackerFeature->axes.height * fScale_h; 
+	fUnion = TwoEllipsesUnionArea( pTracker->predict_pt, szTrackerSize, pTrackerFeature->theta, pFeature->pt, pFeature->axes, pFeature->theta, fOverlap );
+	result.overlap = 1.0 - ( fOverlap / fUnion );
+	
+	return true;
+}
+
+/**
+ * Update the tracker match info with best match feature, return the index of feature list
+ * @pTracker	the selected Trackerlist
+ * @vMatchList  the match infomation
+ * @fMaxDisim	the maximum error from cornerness
+ */
+int CTracker::updateBestMatch( TRACKER *pTracker, vector<MATCHRESULT> vMatchList, float fMaxDisim )
+{
+	int nMatchID = -1;
+	float fMatchScore = 3.0f;
+	
+	for( int i = 0; i < vMatchList.size(); i ++ )	
+	{
+		vMatchList.at(i).cornerDiff /= fMaxDisim;
+		if( ( vMatchList.at(i).cornerDiff < m_fCornernessThresh ) && ( vMatchList.at(i).cornerDiff < m_fOverlapThresh ) )
+		{
+			float score = vMatchList.at(i).cornerDiff + vMatchList.at(i).overlap;
+			if( score < fMatchScore )
+			{
+				nMatchID = vMatchList.at(i).feature_id;
+				fMatchScore = score;
+			}
+		}
+	}
+
+	return nMatchID;
 }

@@ -42,6 +42,8 @@ typedef struct MATCHRESULT
 		float cornerDiff;
 		// The match result, overlap area
 		float overlap;
+		// The match result, distance
+		float dist;
 }_MATCHRESUL_;
 
 
@@ -62,6 +64,10 @@ class CTracker
 		Point2f m_ptScaleFactor;
 		/* global scale factor */
 		float m_fGlobalScale;
+		/* threshold of overlap error */
+		float m_fOverlapThresh;
+		/* threshold of cornerness error */
+		float m_fCornernessThresh;
 
 		/* Imported feature list */
 		vector<OxfordFeature>* m_pAIAFeatureList;
@@ -72,7 +78,6 @@ class CTracker
 		void EKF_update( const Mat & img );
 		void TrajAnalysis();
 		void draw( Mat& img, const Scalar color1, const Scalar color2, const Scalar color3 );
-		void init();
 		void findById( int nId, Mat img );
 		void write_file( const string strFileName );
 		void write_txt_file( const string strFilename );
@@ -81,12 +86,13 @@ class CTracker
 		~CTracker();
 
 	private:
+		void init();
 		bool isAuxiliaryPoint( const vector<Point> traj1, const vector<Point> traj2 );
 		void convPointToMat( const vector<Point> pts, Mat & mat );
 		void clean();
 		void reInitTracker( TRACKER * pTracker );
-		float compareFeatureToTracker( TRACKER * pTracker, OxfordFeature * pFeature, MATCHRESULT &reslut );
-		int updateBestMatch( TRACKER * pTracker, vector<MATCHRESULT> vMatchList );
+		bool compareFeatureToTracker( TRACKER * pTracker, OxfordFeature * pFeature, MATCHRESULT &reslut, int idx_tracker, int idx_feature );
+		int updateBestMatch( TRACKER * pTracker, vector<MATCHRESULT> vMatchList, float fMaxDisim );
 		void verifyTrackerList();
 		void verifyTracker( TRACKER * pTracker );
 

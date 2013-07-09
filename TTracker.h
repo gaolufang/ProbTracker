@@ -54,8 +54,7 @@ typedef struct TRACKER
 
 		// Matched tracker result;
 		Point 	matched_pt;
-		Size	matched_axes;
-		float	matched_theta;
+		Size	
 
 		// The feature including current tracker
 		OxfordFeature* a_feature;

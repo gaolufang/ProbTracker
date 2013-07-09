@@ -19,9 +19,9 @@
 #define PRJ_PAN		 "/home/lufang/Research/Output/Pan/Pan.prj"
 #define PRJ_ZOOM	 "/home/lufang/Research/Output/Zoom/Zoom.prj"
 #define PRJ_MOSER_FU "/home/lufang/Research/Output/Moser_Fu/MoserFu.prj"
-#define CURRENT_PRJ  1
+#define CURRENT_PRJ  2
 
-#define VALIDATION 0
+#define VALIDATION 1
 
 using namespace cv;
 using namespace std;
@@ -55,9 +55,9 @@ int main( int argc, const char** argv )
 	
 	/* Parameter configuration */
 	/*  - Feature selection parameters */
-	int 	nHalf_window_size = 10;
+	int 	nHalf_window_size = 20;
 	float 	fFeature_selection_thresh = 0.4;
-	int 	nMaxFeatureNum = 100;
+	int 	nMaxFeatureNum = 150;
 
 	/* Initialize detector, tracker and image source */
 	CAnisDetector * pAnisList = new CAnisDetector;
@@ -70,11 +70,11 @@ int main( int argc, const char** argv )
 
 	/* Define the color for drawing features & trackers */
 	Scalar sGreen( 0, 255, 0);
-	Scalar sBlue(255, 0, 0);
-	Scalar sBlack(0, 0, 0); 	
-	Scalar sWhite(255, 255, 255); 	
-	Scalar sRed(0, 0, 255); 	
-	Scalar sYellow(0, 255, 255); 	
+	Scalar sBlue( 255, 0, 0 );
+	Scalar sBlack( 0, 0, 0 ); 	
+	Scalar sWhite( 255, 255, 255 ); 	
+	Scalar sRed( 0, 0, 255 ); 	
+	Scalar sYellow( 0, 255, 255 ); 	
 	
 	/* Main loop */
 	Mat img;

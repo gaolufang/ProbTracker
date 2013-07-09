@@ -46,7 +46,9 @@ void COxfordFeatureList::draw( Mat & img, const Scalar color )
 void COxfordFeatureList::filter( const Mat& img, int size = 4, float thresh = 0.0, int nNumFeature = 100 )
 {
 	// Sort the list
+	/* 
 	vector<OxfordFeature> * vSortedList = new vector<OxfordFeature>;
+	 
 	while( m_vFeatureList->size() > 0 && vSortedList->size() < nNumFeature )
 	{
 		float maxCornerness = 0;
@@ -67,7 +69,8 @@ void COxfordFeatureList::filter( const Mat& img, int size = 4, float thresh = 0.
 	m_vFeatureList->clear();
 	m_vBackupFeatureList->clear();
 	m_vFeatureList = vSortedList;
-
+	*/
+	m_vBackupFeatureList->clear();	
 	Mat mFeatureImg = Mat::zeros( img.rows, img.cols, CV_32F );
     OxfordFeature featureMatrix[img.rows][img.cols];
 
